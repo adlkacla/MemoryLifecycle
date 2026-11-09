@@ -7,7 +7,7 @@ namespace MemoryLifecycle.Gc;
 /// </summary>
 public static class PressureScenarios
 {
-    public static ScenarioResult RunSmallObjects(int count = 300_000)
+    public static ScenarioResult RunSmallObjects(int count = 300_000, int size = 100)
     {
         var before = GcSnapshot.Capture();
         var stopwatch = Stopwatch.StartNew();
@@ -15,7 +15,7 @@ public static class PressureScenarios
         long checksum = 0;
         for (var i = 0; i < count; i++)
         {
-            var buffer = new byte[100];
+            var buffer = new byte[size];
             buffer[0] = (byte)i;
             checksum += buffer[0];
         }
@@ -28,7 +28,7 @@ public static class PressureScenarios
             stopwatch.Elapsed, after.Diff(before));
     }
 
-    public static ScenarioResult RunLargeObjects(int count = 10)
+    public static ScenarioResult RunLargeObjects(int count = 10, int size = 100000)
     {
         var before = GcSnapshot.Capture();
         var stopwatch = Stopwatch.StartNew();
@@ -36,7 +36,7 @@ public static class PressureScenarios
         var retained = new List<byte[]>(count);
         for (var i = 0; i < count; i++)
         {
-            retained.Add(new byte[100_000]);
+            retained.Add(new byte[size]);
         }
 
         stopwatch.Stop();
@@ -82,38 +82,10 @@ public static class PressureScenarios
 
     public static void RunMyScenario()
     {
-        int zC = GC.CollectionCount(0);
-        int fC = GC.CollectionCount(1);
-        int sC = GC.CollectionCount(2);
-        Console.WriteLine($"Heap: {GC.GetGCMemoryInfo().HeapSizeBytes}");
-        Console.WriteLine($"Сборки: r0: {zC}, r1: {fC}, r2: {sC}");
-        
-        int count = 200000;
-        int size = 50;
-        Console.WriteLine($"Выделение {count} {size}-byte объектов");
-        for (var i = 0; i < count; i++)
-        {
-            byte[] z = new byte[size];
-        }
-
-        int zCs = GC.CollectionCount(0);
-        int fCs = GC.CollectionCount(1);
-        int sCs = GC.CollectionCount(2);
-        Console.WriteLine($"Сборки: r0: {zCs} r1: {fCs} r2: {sCs}");
-
-        count = 5;
-        size = 90000;
-        Console.WriteLine($"Выделение {count} {size}-byte объектов");
-        for (var i = 0; i < count; i++)
-        {
-            byte[] z = new byte[size];
-        }
-        int zCss = GC.CollectionCount(0);
-        int fCss = GC.CollectionCount(1);
-        int sCss = GC.CollectionCount(2);
-        Console.WriteLine($"Сборки: r0: {zCss} r1: {fCss} r2: {sCss}");
-        Console.WriteLine($"Heap: {GC.GetGCMemoryInfo().HeapSizeBytes}");
-
+        GcObserver.PrintMemoryInfo("Память до эксперимента");
+        RunSmallObjects(200000, 50);
+        RunLargeObjects(90000, 5);
+        GcObserver.PrintMemoryInfo("Память после эксперимента");
     }
 
 
