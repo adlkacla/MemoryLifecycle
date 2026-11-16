@@ -63,7 +63,7 @@ dotnet run --project src\MemoryLifecycle\MemoryLifecycle.csproj
 После сборки: сработал финализатор
 ```
 
-Выводы:
+## Выводы:
 
 1. **Финализатор недетерминирован**: после выхода из метода он не вызвался; сообщения появились только после
    `GC.Collect()` + `GC.WaitForPendingFinalizers()`, поток финализации работает отдельно.
@@ -72,3 +72,73 @@ dotnet run --project src\MemoryLifecycle\MemoryLifecycle.csproj
 3. **Забытый `Dispose()`** оставляет файл открытым до сборки; финализатор `LogFile` только сообщает об утечке
    и не трогает управляемый `StreamWriter`, а `GC.SuppressFinalize` в `Dispose()` исключает ложные сообщения.
    Повторный `Dispose()` ничего не делает, `Write()` после закрытия даёт `ObjectDisposedException`.
+   
+---
+
+# КТ №43. Паттерн Dispose. IAsyncDisposable
+
+## Запуск:
+
+```bash
+[DatabaseConnection 1] соединение открыто
+[DatabaseConnection 1] запрос: SELECT * FROM lolkek
+[DatabaseConnection 1] журнал запросов очищен
+[DatabaseConnection 1] соединение закрыто
+[DatabaseConnection 2] соединение открыто
+[DatabaseConnection 2] запрос: SELECT * FROM lolkek2
+[DatabaseConnection 2] журнал запросов очищен асинхронно
+[DatabaseConnection 2] соединение закрыто
+[FileBuffer 1] буфер открыт
+[FileBuffer 1] буфер освобождён
+[FileBuffer 1] дескриптор 1 закрыт
+[FileBuffer 2] буфер открыт
+[FileBuffer 2] буфер освобождён асинхронно
+[FileBuffer 2] дескриптор 2 закрыт
+1. Синхронный сценарий using
+[DatabaseConnection 3] соединение открыто
+[DatabaseConnection 3] запрос: SELECT * FROM Students
+[DatabaseConnection 3] журнал запросов очищен
+[DatabaseConnection 3] соединение закрыто
+
+2. Асинхронный сценарий await using
+[DatabaseConnection 4] соединение открыто
+[DatabaseConnection 4] запрос: SELECT * FROM Topics
+[DatabaseConnection 4] журнал запросов очищен асинхронно
+[DatabaseConnection 4] соединение закрыто
+
+3. Проверка GC.SuppressFinalize после using
+[DatabaseConnection 5] соединение открыто
+[DatabaseConnection 5] запрос: SELECT 1
+[DatabaseConnection 5] журнал запросов очищен
+[DatabaseConnection 5] соединение закрыто
+После сборки: сообщение финализатора отсутствует
+
+4. Финализатор без Dispose
+[DatabaseConnection 6] соединение открыто
+[DatabaseConnection 6] запрос: UPDATE Students SET Name = 'Test'
+[DatabaseConnection 6] соединение закрыто
+После сборки: финализатор освободил только нативный ресурс
+
+5. FileBuffer: using и await using
+[FileBuffer 3] буфер открыт
+[FileBuffer 3] буфер освобождён
+[FileBuffer 3] дескриптор 3 закрыт
+[FileBuffer 4] буфер открыт
+[FileBuffer 4] буфер освобождён асинхронно
+[FileBuffer 4] дескриптор 4 закрыт
+```
+
+## Выводы
+
+1. **`Dispose(bool disposing)` разделяет ресурсы**: при `true` очищается управляемый журнал запросов и закрывается
+   соединение, при `false` (финализатор) — только соединение. В сценарии 4 строки «журнал запросов очищен» нет:
+   финализатор не трогает управляемые объекты.
+2. **`GC.SuppressFinalize`** вызывается и в `Dispose()`, и в `DisposeAsync()`: в сценарии 3 после сборки
+   повторного сообщения финализатора нет.
+3. **`await using` → `DisposeAsync()`** выполняет асинхронную очистку в `DisposeAsyncCore()`, затем в `finally`
+   закрывает нативный ресурс через `Dispose(false)`. Реализованы оба интерфейса, поэтому работает и `using`,
+   и `await using`; повторные `Dispose()`/`DisposeAsync()` ничего не делают.
+
+---
+
+# КТО ДВИНЕТСЯ ТОТ ФИНАЛИЗАТОР
