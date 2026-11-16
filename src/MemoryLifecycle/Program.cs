@@ -1,4 +1,5 @@
-﻿using MemoryLifecycle.Gc;
+﻿using MemoryLifecycle.Demos;
+using MemoryLifecycle.Gc;
 using System.Runtime;
 using System.Text;
 
@@ -13,6 +14,9 @@ public class Program
         */
 
         //2
-        GcModeScenarios.RunParallelAllocation(objSize: 100, objectsPerWorker: 300000);
+        //GcModeScenarios.RunParallelAllocation(objSize: 100, objectsPerWorker: 300000);
+    
+        //3
+        ResourceDemos.RunLogFileDemo(Path.Combine(Path.GetTempPath(), "memory-lifecycle.log"));
     }
 }

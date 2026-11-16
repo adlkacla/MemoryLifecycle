@@ -1,12 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿namespace MemoryLifecycle.Resources;
 
-namespace MemoryLifecycle.Resources
+/// <summary>
+/// Ресурс без IDisposable: освобождается только финализатором.
+/// </summary>
+public sealed class FakeResource
 {
-    internal class FakeResource
+    private static int counter;
+    private readonly int id = ++counter;
+
+    public FakeResource()
     {
+        Console.WriteLine($"[FakeResource {id}] открыт");
+    }
+
+    ~FakeResource()
+    {
+        Console.WriteLine($"[FakeResource {id}] финализатор");
     }
 }
